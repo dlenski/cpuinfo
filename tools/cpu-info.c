@@ -50,6 +50,8 @@ static const char* uarch_to_string(enum cpuinfo_uarch uarch) {
 	switch (uarch) {
 		case cpuinfo_uarch_unknown:
 			return "unknown";
+		case cpuinfo_uarch_incomplete:
+			return "detection and enumeration incomplete";
 		case cpuinfo_uarch_p5:
 			return "P5";
 		case cpuinfo_uarch_quark:
@@ -345,7 +347,7 @@ int main(int argc, char** argv) {
 		const struct cpuinfo_uarch_info* uarch_info = cpuinfo_get_uarch(i);
 		const char* uarch_string = uarch_to_string(uarch_info->uarch);
 		if (uarch_string == NULL) {
-			printf("\t%" PRIu32 "x Unknown (0x%08" PRIx32 "\n",
+			printf("\t%" PRIu32 "x Unknown (0x%08" PRIx32 ")\n",
 			       uarch_info->core_count,
 			       (uint32_t)uarch_info->uarch);
 		} else {

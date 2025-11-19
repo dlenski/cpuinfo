@@ -52,6 +52,7 @@ static void cpuinfo_x86_count_objects(
 	uint32_t cores_count_ptr[restrict static 1],
 	uint32_t clusters_count_ptr[restrict static 1],
 	uint32_t packages_count_ptr[restrict static 1],
+	uint32_t uarchs_count_ptr[restrict static 1],
 	uint32_t l1i_count_ptr[restrict static 1],
 	uint32_t l1d_count_ptr[restrict static 1],
 	uint32_t l2_count_ptr[restrict static 1],
@@ -142,12 +143,14 @@ static void cpuinfo_x86_count_objects(
 	*l2_count_ptr = l2_count;
 	*l3_count_ptr = l3_count;
 	*l4_count_ptr = l4_count;
+	*uarchs_count_ptr = processor->hybrid_uarch ? 2 : 1;
 }
 
 void cpuinfo_x86_linux_init(void) {
 	struct cpuinfo_x86_linux_processor* x86_linux_processors = NULL;
 	struct cpuinfo_processor* processors = NULL;
 	struct cpuinfo_core* cores = NULL;
+	struct cpuinfo_uarch_info* uarchs = NULL;
 	struct cpuinfo_cluster* clusters = NULL;
 	struct cpuinfo_package* packages = NULL;
 	const struct cpuinfo_processor** linux_cpu_to_processor_map = NULL;
@@ -254,7 +257,7 @@ void cpuinfo_x86_linux_init(void) {
 	} else if (x86_processor.cache.l1d.size != 0) {
 		llc_apic_bits = x86_processor.cache.l1d.apic_bits;
 	}
-	uint32_t packages_count = 0, clusters_count = 0, cores_count = 0;
+	uint32_t packages_count = 0, clusters_count = 0, cores_count = 0, uarchs_count = 0;
 	uint32_t l1i_count = 0, l1d_count = 0, l2_count = 0, l3_count = 0, l4_count = 0;
 	cpuinfo_x86_count_objects(
 		x86_linux_processors_count,
@@ -265,6 +268,7 @@ void cpuinfo_x86_linux_init(void) {
 		&cores_count,
 		&clusters_count,
 		&packages_count,
+		&uarchs_count,
 		&l1i_count,
 		&l1d_count,
 		&l2_count,
@@ -274,6 +278,7 @@ void cpuinfo_x86_linux_init(void) {
 	cpuinfo_log_debug("detected %" PRIu32 " cores", cores_count);
 	cpuinfo_log_debug("detected %" PRIu32 " clusters", clusters_count);
 	cpuinfo_log_debug("detected %" PRIu32 " packages", packages_count);
+	cpuinfo_log_debug("detected %" PRIu32 " uarchs", uarchs_count);	
 	cpuinfo_log_debug("detected %" PRIu32 " L1I caches", l1i_count);
 	cpuinfo_log_debug("detected %" PRIu32 " L1D caches", l1d_count);
 	cpuinfo_log_debug("detected %" PRIu32 " L2 caches", l2_count);
@@ -639,13 +644,31 @@ void cpuinfo_x86_linux_init(void) {
 	cpuinfo_cache_count[cpuinfo_cache_level_4] = l4_count;
 	cpuinfo_max_cache_size = cpuinfo_compute_max_cache_size(&processors[0]);
 
-	cpuinfo_global_uarch = (struct cpuinfo_uarch_info){
+	uarchs = calloc(uarchs_count, sizeof(struct cpuinfo_uarch_info));
+	if (uarchs == NULL) {
+		cpuinfo_log_error(
+			"failed to allocate %zu bytes for descriptions of %" PRIu32 " microarchitectures",
+			uarchs_count * sizeof(struct cpuinfo_uarch_info),
+			uarchs_count);
+		goto cleanup;
+	}
+	uarchs[0] = (struct cpuinfo_uarch_info){
 		.uarch = x86_processor.uarch,
 		.cpuid = x86_processor.cpuid,
 		.processor_count = processors_count,
 		.core_count = cores_count,
 	};
+	if (x86_processor.hybrid_uarch && uarchs_count > 1) {
+		uarchs[1] = (struct cpuinfo_uarch_info){
+			.uarch = cpuinfo_uarch_incomplete,
+			.cpuid = 0,
+			.processor_count = 0,
+			.core_count = 0,
+		};
+	}
 
+	cpuinfo_uarchs_count = uarchs_count;
+	cpuinfo_uarchs = uarchs;
 	cpuinfo_linux_cpu_max = x86_linux_processors_count;
 	cpuinfo_linux_cpu_to_processor_map = linux_cpu_to_processor_map;
 	cpuinfo_linux_cpu_to_core_map = linux_cpu_to_core_map;
@@ -658,6 +681,7 @@ void cpuinfo_x86_linux_init(void) {
 	cores = NULL;
 	clusters = NULL;
 	packages = NULL;
+	uarchs = NULL;
 	l1i = l1d = l2 = l3 = l4 = NULL;
 	linux_cpu_to_processor_map = NULL;
 	linux_cpu_to_core_map = NULL;
@@ -668,6 +692,7 @@ cleanup:
 	free(cores);
 	free(clusters);
 	free(packages);
+	free(uarchs);
 	free(l1i);
 	free(l1d);
 	free(l2);
