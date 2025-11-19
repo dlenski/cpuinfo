@@ -82,11 +82,13 @@ void cpuinfo_x86_init_processor(struct cpuinfo_x86_processor* processor) {
 	* "CPUID, by design, returns different values depending on the core it is executed on.
 	* On hybrid cores more of the CPUID leaves will have data that varies"
 	*/
+	processor->hybrid_uarch = 0;
 	if (max_base_index >= UINT32_C(0x7)) {
 		const struct cpuid_regs leaf7 = cpuidex(UINT32_C(0x7), 0);
 		const bool is_hybrid = !!(leaf7.edx & UINT32_C(0x00004000));
 
 		if (is_hybrid)
 			cpuinfo_log_warning("This is a hybrid processor (CPUID leaf7.edx bit 15 is set). We do not yet properly support enumeration of x86 hybrid cores.");
+		processor->hybrid_uarch = 1;
 	}
 }

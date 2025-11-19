@@ -317,6 +317,9 @@ enum cpuinfo_uarch {
 	/** Microarchitecture is unknown, or the library failed to get
 	   information about the microarchitecture from OS */
 	cpuinfo_uarch_unknown = 0,
+	/** Microarchitecture is known to exist, but support for enumerating
+	   it is not yet complete */
+	cpuinfo_uarch_incomplete = 0x80000001,
 
 	/** Pentium and Pentium MMX microarchitecture. */
 	cpuinfo_uarch_p5 = 0x00100100,
