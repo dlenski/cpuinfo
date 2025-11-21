@@ -48,6 +48,25 @@ static void print_cpuid_vendor(struct cpuid_regs regs, uint32_t eax) {
 	}
 }
 
+static void print_cpuid_hypervisor(struct cpuid_regs regs, uint32_t eax) {
+	if (regs.ebx | regs.ecx | regs.edx) {
+		char hv_id[12];
+		memcpy(&hv_id[0], &regs.ebx, sizeof(regs.ebx));
+		memcpy(&hv_id[4], &regs.ecx, sizeof(regs.ecx));
+		memcpy(&hv_id[8], &regs.edx, sizeof(regs.edx));
+		printf("CPUID %08" PRIX32 ": %08" PRIX32 "-%08" PRIX32 "-%08" PRIX32 "-%08" PRIX32 " [%.12s]\n",
+		       eax,
+		       regs.eax,
+		       regs.ebx,
+		       regs.ecx,
+		       regs.edx,
+		       /* "SL 00" */ hv_id);
+	} else {
+		print_cpuid(regs, eax);
+	}
+}
+
+
 static void print_cpuid_brand_string(struct cpuid_regs regs, uint32_t eax) {
 	char brand_string[16];
 	memcpy(&brand_string[0], &regs.eax, sizeof(regs.eax));
@@ -210,6 +229,27 @@ int main(int argc, char** argv) {
 					print_cpu_index(lp, n_log_proc);
 					print_cpuid(cpuidex(eax, 0), eax);
 					break;
+			}
+		}
+	}
+
+	/**
+	 * CPUID[1].ECX bit 31 is supposed to indicate whether or not
+	 * a hypervisor is running, but not all hypervisors set it.
+	 */
+	const uint32_t max_hypervisor_index = cpuid(UINT32_C(0x40000000)).eax;
+	for (uint32_t eax = UINT32_C(0x40000000); eax <= max_hypervisor_index; eax++) {
+		for (uint32_t lp = 0; lp < n_log_proc; lp++) {
+			force_one_cpu(lp, n_log_proc);
+
+			switch (eax) {
+				case UINT32_C(0x40000000):
+					print_cpu_index(lp, n_log_proc);
+					print_cpuid_hypervisor(cpuid(eax), eax);
+					break;
+				default:
+					print_cpu_index(lp, n_log_proc);
+					print_cpuid(cpuidex(eax, 0), eax);
 			}
 		}
 	}
